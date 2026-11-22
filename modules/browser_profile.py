@@ -118,10 +118,24 @@ def open_login_window(chrome: str, path: Path) -> int:
     sign-in page and wait until that Chrome quits. Google often refuses
     sign-in from automated browsers, which is why this is plain Chrome.
     """
-    return subprocess.call([
-        chrome,
+    return subprocess.call([chrome, *login_window_args(path)])
+
+
+def login_window_args(path: Path, platform: str = sys.platform) -> List[str]:
+    """
+    Chrome arguments for the sign-in window.
+
+    On Linux, ChromeDriver starts the scraping Chrome with
+    --password-store=basic, which encrypts cookies with a fixed key instead of
+    the desktop keyring (GNOME Keyring, KWallet). The sign-in window must use
+    the same store, or the scraping Chrome cannot decrypt the sign-in cookies
+    and runs signed out.
+    """
+    args = [
         f"--user-data-dir={path}",
         "--no-first-run",
         "--no-default-browser-check",
-        LOGIN_URL,
-    ])
+    ]
+    if platform.startswith("linux"):
+        args.append("--password-store=basic")
+    return [*args, LOGIN_URL]

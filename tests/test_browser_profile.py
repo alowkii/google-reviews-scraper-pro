@@ -107,6 +107,26 @@ def test_find_chrome_prefers_chrome_bin(tmp_path, monkeypatch):
     assert bp.find_chrome() == str(fake)
 
 
+class TestLoginWindowArgs:
+    """The sign-in window must store cookies the way the scraping Chrome reads them."""
+
+    def test_linux_uses_chromedrivers_password_store(self, tmp_path):
+        # ChromeDriver launches the scraping Chrome with --password-store=basic.
+        # A sign-in window on the desktop keyring writes cookies it can't decrypt.
+        args = bp.login_window_args(tmp_path, platform="linux")
+        assert "--password-store=basic" in args
+
+    @pytest.mark.parametrize("platform", ["darwin", "win32"])
+    def test_other_platforms_unchanged(self, tmp_path, platform):
+        args = bp.login_window_args(tmp_path, platform=platform)
+        assert not any(a.startswith("--password-store") for a in args)
+
+    def test_opens_profile_on_sign_in_page(self, tmp_path):
+        args = bp.login_window_args(tmp_path, platform="linux")
+        assert f"--user-data-dir={tmp_path}" in args
+        assert args[-1] == bp.LOGIN_URL
+
+
 class TestBrowserLoginCommand:
 
     @pytest.fixture
