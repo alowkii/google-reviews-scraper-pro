@@ -38,8 +38,12 @@ dependencies = [
     "botocore~=1.35.99",
     "pydantic>=2.11.5,<3",
     "requests>=2.31.0",
+    "rich>=13.7.0",
     "PyYAML>=6.0",
 ]
+
+[dependency-groups]
+dev = ["pytest"]
 
 [project.urls]
 Homepage = "https://github.com/georgekhananaev/google-reviews-scraper-pro"
@@ -48,6 +52,11 @@ Issues = "https://github.com/georgekhananaev/google-reviews-scraper-pro/issues"
 
 [project.scripts]
 scrape-reviews = "start:main"
+
+# The code lives in modules/ plus two top-level scripts, not in a package
+# named after the project, so tell hatchling what to ship.
+[tool.hatch.build.targets.wheel]
+only-include = ["modules", "start.py", "api_server.py"]
 
 [build-system]
 requires = ["hatchling"]
