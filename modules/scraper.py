@@ -64,6 +64,12 @@ for (const b of pane.querySelectorAll('button')) {
 return null;
 """
 CARD_SEL = "div[data-review-id]"
+# Cards handled in an earlier scroll iteration get this attribute, so each
+# iteration only asks the browser for new cards. Without it every iteration
+# re-read every card on the page (one WebDriver call each), which made big
+# places slow down quadratically (~2 min per iteration at 3,000 reviews).
+DONE_ATTR = "data-grs-done"
+FRESH_CARD_SEL = f"{CARD_SEL}:not([{DONE_ATTR}])"
 # Full-page consent screen (consent.google.com). The jsname of "Accept all"
 # doesn't depend on the page language; the fallback takes any button of the
 # consent form.
@@ -1801,10 +1807,14 @@ class GoogleReviewsScraper:
                     pass
 
                 try:
-                    cards = pane.find_elements(By.CSS_SELECTOR, CARD_SEL)
+                    cards = pane.find_elements(By.CSS_SELECTOR, FRESH_CARD_SEL)
+                    # No unhandled cards but handled ones exist: an ordinary
+                    # "nothing new this iteration", not "no cards on the page".
+                    only_done = not cards and driver.execute_script(
+                        "return !!arguments[0].querySelector(arguments[1]);", pane, CARD_SEL)
 
                     # Check for valid cards
-                    if len(cards) == 0:
+                    if len(cards) == 0 and not only_done:
                         consecutive_no_cards += 1
                         log.info(f"No review cards found in this iteration (consecutive: {consecutive_no_cards})")
 
@@ -1896,6 +1906,14 @@ class GoogleReviewsScraper:
                                     break
                             else:
                                 past_boundary_streak = 0
+
+                    if cards:
+                        try:
+                            driver.execute_script(
+                                "for (const c of arguments[0]) c.setAttribute(arguments[1], '1');",
+                                cards, DONE_ATTR)
+                        except WebDriverException:
+                            pass  # stale cards: re-read next time, skipped via processed_ids
 
                     if max_reviews > 0 and len(processed_ids) >= max_reviews:
                         log.info("Stopping: looked at max_reviews (%d) reviews", max_reviews)
